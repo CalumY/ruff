@@ -5,6 +5,32 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 use ruff_python_ast::whitespace::leading_space;
 
+/// ## What it does
+/// Checks for the presence tabs in indentation.
+///
+/// ## Why is this bad?
+/// [PEP 8] recommends spaces are used for indentation.
+///
+/// > Spaces are the preferred indentation method.
+/// >
+/// > Tabs should be used solely to remain consistent with code that is
+/// already indented with tabs.
+/// >
+/// > Python disallows mixing tabs and spaces for indentation.
+///
+/// ## Example - Where `--->` represents a tab:
+/// ```python
+/// def foo(x):
+/// --->return x * 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x):
+///     return x * 2
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 #[violation]
 pub struct TabIndentation;
 
