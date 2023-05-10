@@ -3,6 +3,7 @@
 import argparse
 import os
 import re
+import subprocess
 import textwrap
 from collections.abc import Sequence
 from pathlib import Path
@@ -45,6 +46,9 @@ KNOWN_PARSE_ERRORS = [
     "mixed-spaces-and-tabs",
     "trailing-whitespace",
 ]
+
+# For some docs we want to ignore that a rule violation is detected.
+KNOWN_RULE_VIOLATIONS = []
 
 
 class CodeBlockError(Exception):
@@ -133,6 +137,110 @@ def format_file(
     return 0
 
 
+def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
+    """Check rule violation present."""
+    first_snippet = True  # Example is first snippet and violation should be present
+    missing_violation = 0
+    unexpected_violation = 0
+
+    def _snipped_match(match: Match[str]) -> None:
+        nonlocal first_snippet
+        nonlocal missing_violation
+        nonlocal unexpected_violation
+
+        output = subprocess.run(
+            [
+                "ruff",
+                "check",
+                "-",
+                "--stdin-filename",
+                f"test_{rule}.{'pyi' if 'PYI' in rule else 'py'}",
+                f"--select={rule}",
+                "--format=json",
+            ],
+            input=textwrap.dedent(match["code"]),
+            capture_output=True,
+            timeout=2,
+            text=True,
+        )
+
+        if first_snippet:
+            if rule not in output.stdout:
+                missing_violation += 1
+                print_violation_error(match["code"], violation_type="Expected")
+        else:
+            if rule in output.stdout:
+                unexpected_violation += 1
+                print_violation_error(match["code"], violation_type="Unexpected")
+
+        first_snippet = False
+
+    def print_violation_error(code: str, violation_type: str) -> None:
+        """Print violation error."""
+        nonlocal rule_name
+        print(
+            f"{violation_type} violation {rule} ({rule_name}) was"
+            f" {'' if violation_type == 'Unexpected' else 'not '}found in the following"
+            " code snippet.",
+        )
+
+        print("/// ```python")
+        for line in code.splitlines():
+            output_line = "///"
+            if len(line) > 0:
+                output_line = f"{output_line} {line}"
+
+            print(output_line)
+
+        print("/// ```")
+        print("\n")
+
+    SNIPPED_RE.sub(_snipped_match, src)
+
+    return missing_violation, unexpected_violation
+
+
+def check_ruff_rules(docs: list[Path]) -> tuple[int, int]:
+    """Check the expected rule violations are present in the docs.
+
+    Returns the number of unexpected and missing violations.
+    """
+    unexpected_violations, missing_violations = 0, 0
+    for file in docs:
+        rule_name = file.name.split(".")[0]
+        if rule_name in KNOWN_RULE_VIOLATIONS:
+            continue
+
+        with file.open() as f:
+            contents = f.read()
+
+        first_line = contents.splitlines()[0]
+
+        # Remove everything before the first example
+        contents = contents[contents.find("## Example") :]
+
+        # Remove everything after the last example
+        contents = contents[: contents.rfind("```")] + "```"
+
+        rule = None
+        if first_line.find("(") != -1 and first_line.find(")") != -1:
+            first_line = first_line[first_line.find("(") + 1 :]
+            rule = first_line[: first_line.find(")")]
+
+        rule_name = file.name.split(".")[0]
+
+        if rule is not None:
+            rule_unexpected_violations, rule_missing_violations = check_rule(
+                contents,
+                rule,
+                rule_name,
+            )
+            unexpected_violations += rule_unexpected_violations
+            missing_violations += rule_missing_violations
+
+    return unexpected_violations, missing_violations
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Check code snippets in docs are formatted by black."""
     parser = argparse.ArgumentParser(
@@ -180,6 +288,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for known_list, file_string in [
         (KNOWN_FORMATTING_VIOLATIONS, "formatting violations"),
         (KNOWN_PARSE_ERRORS, "parse errors"),
+        (KNOWN_RULE_VIOLATIONS, "rule violations"),
     ]:
         if known_list != sorted(known_list):
             print(
@@ -210,13 +319,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif result == 2 and not error_known:
             errors += 1
 
+    unexpected_violations, missing_violations = check_ruff_rules(docs)
+
     if violations > 0:
         print(f"Formatting violations identified: {violations}")
 
     if errors > 0:
         print(f"New code block parse errors identified: {errors}")
 
-    if violations > 0 or errors > 0:
+    if unexpected_violations > 0:
+        print(f"Unexpected rule violations identified: {unexpected_violations}")
+
+    if missing_violations > 0:
+        print(f"Missing rule violations identified: {missing_violations}")
+
+    if sum([violations, errors, unexpected_violations, missing_violations]) > 0:
         return 1
 
     return 0
