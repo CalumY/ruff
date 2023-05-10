@@ -148,6 +148,11 @@ def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
         nonlocal missing_violation
         nonlocal unexpected_violation
 
+        violation_type = "expected" if first_snippet else "unexpected"
+        # Print statement added to give visual sign that the script is running as
+        # running ruff via cargo is not as quick as using the pip installed version
+        print(f"Checking {rule_name} for {violation_type} violation")
+
         output = subprocess.run(
             [
                 "cargo",
@@ -171,11 +176,11 @@ def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
         if first_snippet:
             if rule not in output.stdout:
                 missing_violation += 1
-                print_violation_error(match["code"], violation_type="Expected")
+                print_violation_error(match["code"], violation_type.capitalize())
         else:
             if rule in output.stdout:
                 unexpected_violation += 1
-                print_violation_error(match["code"], violation_type="Unexpected")
+                print_violation_error(match["code"], violation_type.capitalize())
 
         first_snippet = False
 
