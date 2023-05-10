@@ -336,6 +336,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Please remove them and re-run.")
             return 1
 
+    unexpected_violations, missing_violations = check_ruff_rules(docs)
+
+    if unexpected_violations > 0:
+        print(f"Unexpected rule violations identified: {unexpected_violations}")
+
+    if missing_violations > 0:
+        print(f"Missing rule violations identified: {missing_violations}")
+
+    if unexpected_violations > 0 or missing_violations > 0:
+        return 1
+
     violations = 0
     errors = 0
     for file in docs:
@@ -351,21 +362,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif result == 2 and not error_known:
             errors += 1
 
-    unexpected_violations, missing_violations = check_ruff_rules(docs)
-
     if violations > 0:
         print(f"Formatting violations identified: {violations}")
 
     if errors > 0:
         print(f"New code block parse errors identified: {errors}")
 
-    if unexpected_violations > 0:
-        print(f"Unexpected rule violations identified: {unexpected_violations}")
-
-    if missing_violations > 0:
-        print(f"Missing rule violations identified: {missing_violations}")
-
-    if sum([violations, errors, unexpected_violations, missing_violations]) > 0:
+    if violations > 0 or errors > 0:
         return 1
 
     return 0
