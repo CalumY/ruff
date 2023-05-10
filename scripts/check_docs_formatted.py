@@ -150,7 +150,11 @@ def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
 
         output = subprocess.run(
             [
+                "cargo",
+                "run",
+                "--bin",
                 "ruff",
+                "--",
                 "check",
                 "-",
                 "--stdin-filename",
