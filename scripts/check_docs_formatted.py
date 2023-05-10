@@ -169,6 +169,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Please generate rules first.")
         return 1
 
+    docs = [*static_docs, *generated_docs]
     black_mode = Mode(
         target_versions={TargetVersion[val.upper()] for val in TARGET_VERSIONS},
     )
@@ -196,7 +197,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     violations = 0
     errors = 0
-    for file in [*static_docs, *generated_docs]:
+    for file in docs:
         rule_name = file.name.split(".")[0]
         if rule_name in KNOWN_FORMATTING_VIOLATIONS:
             continue
