@@ -137,16 +137,21 @@ def format_file(
     return 0
 
 
-def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
-    """Check rule violation present."""
+def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int, str]:
+    """Check rule violation present.
+
+    Return the number of missing and unexpected violations and the rule violations.
+    """
     first_snippet = True  # Example is first snippet and violation should be present
     missing_violation = 0
     unexpected_violation = 0
+    rule_violations = ""
 
     def _snipped_match(match: Match[str]) -> None:
         nonlocal first_snippet
         nonlocal missing_violation
         nonlocal unexpected_violation
+        nonlocal rule_violations
 
         violation_type = "expected" if first_snippet else "unexpected"
         # Print statement added to give visual sign that the script is running as
@@ -176,37 +181,43 @@ def check_rule(src: str, rule: str, rule_name: str) -> tuple[int, int]:
         if first_snippet:
             if rule not in output.stdout:
                 missing_violation += 1
-                print_violation_error(match["code"], violation_type.capitalize())
+                rule_violations += print_violation_error(
+                    match["code"],
+                    violation_type.capitalize(),
+                )
         else:
             if rule in output.stdout:
                 unexpected_violation += 1
-                print_violation_error(match["code"], violation_type.capitalize())
+                rule_violations += print_violation_error(
+                    match["code"],
+                    violation_type.capitalize(),
+                )
 
         first_snippet = False
 
-    def print_violation_error(code: str, violation_type: str) -> None:
+    def print_violation_error(code: str, violation_type: str) -> str:
         """Print violation error."""
         nonlocal rule_name
-        print(
+
+        violation_msg = (
             f"{violation_type} violation {rule} ({rule_name}) was"
             f" {'' if violation_type == 'Unexpected' else 'not '}found in the following"
-            " code snippet.",
+            " code snippet.\n"
+            "/// ```python\n"
         )
 
-        print("/// ```python")
         for line in code.splitlines():
             output_line = "///"
             if len(line) > 0:
-                output_line = f"{output_line} {line}"
+                output_line = f"{output_line} {line}\n"
 
-            print(output_line)
+            violation_msg += output_line
 
-        print("/// ```")
-        print("\n")
+        return violation_msg + "/// ```\n"
 
     SNIPPED_RE.sub(_snipped_match, src)
 
-    return missing_violation, unexpected_violation
+    return missing_violation, unexpected_violation, rule_violations
 
 
 def check_ruff_rules(docs: list[Path]) -> tuple[int, int]:
@@ -215,6 +226,7 @@ def check_ruff_rules(docs: list[Path]) -> tuple[int, int]:
     Returns the number of unexpected and missing violations.
     """
     unexpected_violations, missing_violations = 0, 0
+    all_rule_violations = []
     for file in docs:
         rule_name = file.name.split(".")[0]
         if rule_name in KNOWN_RULE_VIOLATIONS:
@@ -239,13 +251,24 @@ def check_ruff_rules(docs: list[Path]) -> tuple[int, int]:
         rule_name = file.name.split(".")[0]
 
         if rule is not None:
-            rule_unexpected_violations, rule_missing_violations = check_rule(
+            (
+                rule_unexpected_violations,
+                rule_missing_violations,
+                rule_violations,
+            ) = check_rule(
                 contents,
                 rule,
                 rule_name,
             )
             unexpected_violations += rule_unexpected_violations
             missing_violations += rule_missing_violations
+            if rule_violations != "":
+                all_rule_violations.append(rule_violations)
+
+    print("\n")
+    print("Found the following rule violations:")
+    for violation in all_rule_violations:
+        print(violation)
 
     return unexpected_violations, missing_violations
 
