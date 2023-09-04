@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: "PR - Checkout Branch"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
@@ -43,7 +43,7 @@ jobs:
         run: cargo benchmark --save-baseline=pr
 
       - name: "Main - Checkout Branch"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           clean: false
           ref: main
