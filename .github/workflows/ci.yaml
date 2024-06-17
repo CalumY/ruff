@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: tj-actions/changed-files@v43
+      - uses: tj-actions/changed-files@v44
         id: changed
         with:
           files_yaml: |
@@ -245,7 +245,7 @@ jobs:
           name: ruff
           path: target/debug
 
-      - uses: dawidd6/action-download-artifact@v3
+      - uses: dawidd6/action-download-artifact@v6
         name: Download baseline Ruff binary
         with:
           name: ruff
